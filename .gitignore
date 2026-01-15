@@ -1,72 +1,34 @@
-```
-# Dependencies
-node_modules/
-venv/
-.venv/
-__pycache__/
-*.egg-info/
-dist/
-build/
-target/
-
-# Python
+```markdown
+# Compiled and build artifacts
 *.pyc
-*.pyo
-*.pyd
-.Python
-env/
-.venv/
-venv/
-ENV/
-pip-log.txt
-pip-delete-this-directory.txt
-.tox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.log
-.DS_Store
-Thumbs.db
-
-# Node.js
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-node_modules/
+__pycache__/
+*.o
+*.obj
 dist/
 build/
-.nyc_output
-coverage/
-*.lcov
 
-# TypeScript/JavaScript
-*.tsbuildinfo
-*.js.map
-*.mjs.map
-*.cjs.map
+# Dependencies
+.venv/
+venv/
+node_modules/
+.julia/
+.zig-cache/
 
-# Vite
-!.vite
-.vite/
+# Logs and temp files
+*.log
+*.tmp
+*.swp
 
-# VSCode
-.vscode/
-
-# Environment variables
+# Environment
 .env
 .env.local
-.env.*
-!.env.example
+*.env.*
 
-# OS generated files
+# Editors
+.vscode/
+.idea/
+
+# System files
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
 ```

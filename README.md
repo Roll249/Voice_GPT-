@@ -36,12 +36,23 @@ cd /workspace
 ```
 
 2. Run the setup tool:
+
+For most systems (Ubuntu, Debian, etc.):
 ```bash
 # Make the setup script executable
 chmod +x src/cli/setup.py
 
 # Run the complete setup
 python src/cli/setup.py --all
+```
+
+For Arch Linux:
+```bash
+# Make the Arch setup script executable
+chmod +x arch_setup.sh
+
+# Run the complete setup
+./arch_setup.sh --all
 ```
 
 Or run specific setup steps:
