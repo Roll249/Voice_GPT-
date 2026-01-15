@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Arch Linux CLI Setup Tool for Vietnamese Text-to-Speech Application
-This script handles installation of dependencies and initial setup for Arch Linux systems
+Universal Setup Tool for Vietnamese Text-to-Speech Application
+This script handles installation of dependencies and initial setup for various systems
+including Arch Linux, Ubuntu/Debian, and other distributions
 """
 
 import argparse
@@ -10,6 +11,7 @@ import sys
 import os
 from pathlib import Path
 import platform
+import shutil
 
 
 def run_command(cmd, desc="Running command"):
@@ -27,25 +29,39 @@ def run_command(cmd, desc="Running command"):
         return None
 
 
-def check_arch():
-    """Check if the system is Arch Linux"""
-    try:
-        # Check for Arch Linux by looking at /etc/os-release
-        with open('/etc/os-release', 'r') as f:
-            content = f.read()
-            if 'arch' in content.lower():
-                print("[INFO] Confirmed Arch Linux system")
-                return True
-    except FileNotFoundError:
-        pass
+def detect_os():
+    """Detect the operating system"""
+    system = platform.system().lower()
     
-    # Alternative check using lsb_release
-    result = run_command("lsb_release -i", "Checking OS distribution")
-    if result and 'arch' in result.lower():
-        return True
-        
-    print("[WARNING] Could not confirm Arch Linux system")
-    return False
+    if system == "linux":
+        # Try to detect specific distribution
+        try:
+            with open('/etc/os-release', 'r') as f:
+                content = f.read()
+                if 'arch' in content.lower():
+                    return 'arch'
+                elif 'ubuntu' in content.lower() or 'debian' in content.lower():
+                    return 'debian'
+                elif 'centos' in content.lower() or 'rhel' in content.lower() or 'fedora' in content.lower():
+                    return 'redhat'
+                else:
+                    return 'linux'
+        except FileNotFoundError:
+            # Fallback to checking for specific commands
+            if shutil.which('pacman'):
+                return 'arch'
+            elif shutil.which('apt') or shutil.which('apt-get'):
+                return 'debian'
+            elif shutil.which('yum') or shutil.which('dnf'):
+                return 'redhat'
+            else:
+                return 'linux'
+    elif system == "darwin":
+        return 'macos'
+    elif system == "windows":
+        return 'windows'
+    else:
+        return 'unknown'
 
 
 def check_gpu():
@@ -63,43 +79,134 @@ def check_gpu():
         return False
 
 
-def install_system_dependencies():
-    """Install system-level dependencies for Arch Linux"""
-    print("[INFO] Installing system dependencies for Arch Linux...")
+def install_system_dependencies(os_type):
+    """Install system-level dependencies based on OS type"""
+    print(f"[INFO] Installing system dependencies for {os_type}...")
     
-    # Update package database first
-    run_command("sudo pacman -Sy", "Updating package database")
+    if os_type == 'arch':
+        # Update package database first
+        run_command("sudo pacman -Sy", "Updating package database")
+        
+        # Install system dependencies
+        system_packages = [
+            "python-pip",
+            "python-setuptools", 
+            "python-wheel",
+            "ffmpeg",
+            "gcc",
+            "make",
+            "cmake",
+            "alsa-lib",
+            "portaudio",
+            "libsndfile",
+            "wget",
+            "git",
+            "unzip",
+            "python-numpy",
+            "python-scipy",
+            "python-pyaudio"
+        ]
+        
+        # Install packages one by one to handle potential conflicts
+        for package in system_packages:
+            cmd = f"sudo pacman -S --noconfirm {package}"
+            result = run_command(cmd, f"Installing {package}")
+            if result is None:
+                print(f"[WARNING] Failed to install {package}, continuing...")
+                
+    elif os_type == 'debian':
+        # Update package database first
+        run_command("sudo apt update", "Updating package database")
+        
+        # Install system dependencies
+        system_packages = [
+            "python3-pip",
+            "python3-dev",
+            "build-essential",
+            "ffmpeg",
+            "gcc",
+            "make",
+            "cmake",
+            "libasound2-dev",
+            "portaudio19-dev",
+            "libsndfile1-dev",
+            "wget",
+            "git",
+            "unzip",
+            "python3-numpy",
+            "python3-scipy",
+            "python3-pyaudio"
+        ]
+        
+        for package in system_packages:
+            cmd = f"sudo apt install -y {package}"
+            result = run_command(cmd, f"Installing {package}")
+            if result is None:
+                print(f"[WARNING] Failed to install {package}, continuing...")
+                
+    elif os_type == 'redhat':
+        # Install system dependencies
+        system_packages = [
+            "python3-pip",
+            "python3-devel",
+            "gcc",
+            "gcc-c++",
+            "make",
+            "cmake",
+            "ffmpeg",
+            "alsa-lib-devel",
+            "portaudio-devel",
+            "libsndfile-devel",
+            "wget",
+            "git",
+            "unzip",
+            "numpy",
+            "scipy"
+        ]
+        
+        for package in system_packages:
+            # Try dnf first (Fedora), then yum (CentOS/RHEL)
+            cmd1 = f"sudo dnf install -y {package}"
+            cmd2 = f"sudo yum install -y {package}"
+            
+            result = run_command(cmd1, f"Installing {package} (dnf)")
+            if result is None:
+                result = run_command(cmd2, f"Installing {package} (yum)")
+                
+            if result is None:
+                print(f"[WARNING] Failed to install {package}, continuing...")
+                
+    elif os_type == 'macos':
+        # Check if Homebrew is installed
+        if not shutil.which('brew'):
+            print("[INFO] Installing Homebrew...")
+            run_command('/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"', 
+                       "Installing Homebrew")
+        
+        # Install system dependencies
+        system_packages = [
+            "ffmpeg",
+            "gcc",
+            "cmake",
+            "portaudio",
+            "libsndfile",
+            "wget",
+            "git",
+            "unzip"
+        ]
+        
+        for package in system_packages:
+            cmd = f"brew install {package}"
+            result = run_command(cmd, f"Installing {package}")
+            if result is None:
+                print(f"[WARNING] Failed to install {package}, continuing...")
     
-    # Install system dependencies
-    system_packages = [
-        "python-pip",
-        "python-setuptools",
-        "python-wheel",
-        "ffmpeg",
-        "gcc",
-        "make",
-        "cmake",
-        "alsa-lib",
-        "portaudio",
-        "libsndfile",
-        "wget",
-        "git",
-        "unzip",
-        "python-numpy",
-        "python-scipy",
-        "python-pyaudio"
-    ]
-    
-    # Install packages one by one to handle potential conflicts
-    for package in system_packages:
-        cmd = f"sudo pacman -S --noconfirm {package}"
-        result = run_command(cmd, f"Installing {package}")
-        if result is None:
-            print(f"[WARNING] Failed to install {package}, continuing...")
+    else:
+        print(f"[WARNING] Unsupported OS type: {os_type}. Skipping system dependency installation.")
 
 
 def install_python_dependencies(cuda_available=False):
-    """Install required Python packages using virtual environment for Arch Linux"""
+    """Install required Python packages using virtual environment"""
     print("[INFO] Creating virtual environment for Python dependencies...")
     
     try:
@@ -153,7 +260,9 @@ def install_python_dependencies(cuda_available=False):
         "requests",
         "python-multipart",
         "huggingface_hub",
-        "sentencepiece"
+        "sentencepiece",
+        "accelerate",
+        "bitsandbytes"
     ]
     
     for package in packages:
@@ -162,7 +271,8 @@ def install_python_dependencies(cuda_available=False):
             print(f"[SUCCESS] Installing {package} in virtual environment")
         except subprocess.CalledProcessError as e:
             print(f"[ERROR] Installing {package}: {e}")
-            return False
+            # Continue with other packages
+            continue
     
     return True
 
@@ -171,11 +281,12 @@ def create_project_structure():
     """Create necessary directories"""
     dirs = [
         "models",
-        "uploads",
+        "uploads", 
         "outputs",
         "references",
         "temp",
-        "data"
+        "data",
+        "scripts"
     ]
     
     for dir_name in dirs:
@@ -394,7 +505,7 @@ def clean_text(text: str) -> str:
     # Remove extra whitespace
     text = re.sub(r'\\s+', ' ', text)
     # Remove special characters but keep Vietnamese characters
-    text = re.sub(r'[^\\u00C0-\\u1EF9\\w\\s.,!?\\'"-]', ' ', text)
+    text = re.sub(r'[^\\u00C0-\\u1EF9\\w\\s.,!?\\\'"-]', ' ', text)
     return text.strip()
 
 def split_text_into_chunks(text: str, max_length: int = 200) -> list:
@@ -450,7 +561,7 @@ if __name__ == "__main__":
 
 
 def create_requirements():
-    """Create requirements.txt file optimized for Arch Linux"""
+    """Create requirements.txt file"""
     requirements = '''torch>=2.1.0
 torchvision>=0.16.0
 torchaudio>=2.1.0
@@ -462,7 +573,7 @@ uvicorn[standard]>=0.23.0
 gradio>=4.0.0
 pydub>=0.25.1
 librosa>=0.10.0
-soundfile>=0.12.1
+soundfile>=0.22.0
 PyPDF2>=3.0.0
 numpy>=1.24.0
 scipy>=1.11.0
@@ -483,9 +594,6 @@ bitsandbytes>=0.41.0
 
 def create_arch_specific_configs():
     """Create Arch Linux specific configurations"""
-    # Create scripts directory if it doesn't exist
-    Path("scripts").mkdir(exist_ok=True)
-    
     # Create AUR helper check script
     aur_helper_check = '''#!/bin/bash
 # Check if yay or paru is installed, install if not
@@ -498,7 +606,7 @@ if ! command -v yay &> /dev/null && ! command -v paru &> /dev/null; then
     rm -rf yay
 fi
 '''
-    
+
     with open("scripts/install_aur_helper.sh", "w") as f:
         f.write(aur_helper_check)
     
@@ -508,7 +616,7 @@ fi
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Setup Vietnamese TTS Application for Arch Linux")
+    parser = argparse.ArgumentParser(description="Setup Vietnamese TTS Application for various systems")
     parser.add_argument("--install-deps", action="store_true", help="Install dependencies")
     parser.add_argument("--setup-backend", action="store_true", help="Setup backend components")
     parser.add_argument("--check-gpu", action="store_true", help="Check GPU availability")
@@ -516,12 +624,12 @@ def main():
     
     args = parser.parse_args()
     
-    print("Vietnamese Text-to-Speech Application Setup for Arch Linux")
+    print("Vietnamese Text-to-Speech Application Universal Setup")
     print("=" * 60)
     
-    # Verify we're on Arch Linux
-    if not check_arch():
-        print("[WARNING] This script is designed for Arch Linux. Continuing anyway...")
+    # Detect the OS
+    detected_os = detect_os()
+    print(f"[INFO] Detected OS: {detected_os}")
     
     # Create project structure
     create_project_structure()
@@ -530,7 +638,7 @@ def main():
         check_gpu()
     
     if args.all or args.install_deps:
-        install_system_dependencies()
+        install_system_dependencies(detected_os)
         create_requirements()
         cuda_available = check_gpu()
         success = install_python_dependencies(cuda_available)
@@ -542,7 +650,7 @@ def main():
     if args.all or args.setup_backend:
         setup_backend()
     
-    print("\n[SUCCESS] Arch Linux setup completed!")
+    print("\n[SUCCESS] Universal setup completed!")
     print("\nTo run the application:")
     print("1. cd /workspace")
     print("2. source venv/bin/activate  # Activate the virtual environment")
