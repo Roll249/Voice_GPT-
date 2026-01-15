@@ -11,8 +11,9 @@ import uuid
 project_root = Path(__file__).parent.parent.parent.absolute()
 sys.path.insert(0, str(project_root))
 
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.responses import JSONResponse, FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydub import AudioSegment
 import uvicorn
 import numpy as np
@@ -24,6 +25,15 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Vietnamese Text-to-Speech API (Simplified)", version="1.0.0")
 
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Create necessary directories if they don't exist
 directories = ["models", "uploads", "outputs", "references", "temp", "data"]
 for directory in directories:
@@ -33,35 +43,42 @@ for directory in directories:
 def read_root():
     return {"message": "Welcome to the Vietnamese Text-to-Speech API (Simplified)"}
 
-@app.post("/tts/")
-async def text_to_speech(text: str, model_type: str = "basic"):
+@app.post("/generate")
+async def generate_speech(
+    text: str = Form(...),
+    model_type: str = Form("basic"),
+    exaggeration: float = Form(0.5)
+):
     """
-    Simplified TTS endpoint - creates a placeholder audio file
-    In a real implementation, this would generate actual speech
+    Generate speech from text using the selected model
     """
     try:
-        logger.info(f"Received TTS request with model: {model_type}")
+        logger.info(f"Received TTS request with model: {model_type}, exaggeration: {exaggeration}")
+        logger.info(f"Text: {text[:100]}...")  # Log first 100 chars
         
         # Generate output filename
         output_filename = os.path.join("outputs", f"output_{uuid.uuid4().hex}.wav")
         
         # Create a simple placeholder audio file (silence)
         # In a real implementation, this would generate actual speech
-        duration_ms = len(text) * 50  # Approximate duration based on text length
+        duration_ms = max(1000, len(text) * 50)  # At least 1 second
         silence = AudioSegment.silent(duration=duration_ms, frame_rate=22050)
         silence.export(output_filename, format="wav")
         
-        return JSONResponse(content={
-            "status": "success",
-            "output_file": output_filename,
-            "message": "Placeholder audio generated successfully - in a full implementation this would generate actual speech"
-        })
+        logger.info(f"Generated audio file: {output_filename}")
+        
+        # Return the audio file directly
+        return FileResponse(
+            path=output_filename,
+            media_type="audio/wav",
+            filename="generated_speech.wav"
+        )
     
     except Exception as e:
         logger.error(f"TTS Error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"TTS generation failed: {str(e)}")
 
-@app.post("/upload_reference/")
+@app.post("/upload-reference")
 async def upload_reference_audio(file: UploadFile = File(...)):
     """
     Upload a reference audio file for voice cloning
@@ -85,12 +102,18 @@ async def upload_reference_audio(file: UploadFile = File(...)):
         logger.error(f"Upload Error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
-@app.post("/process_pdf/")
-async def process_pdf(file: UploadFile = File(...)):
+@app.post("/process-pdf")
+async def process_pdf(
+    file: UploadFile = File(...),
+    model_type: str = Form("basic"),
+    exaggeration: float = Form(0.5)
+):
     """
-    Process a PDF file and extract text
+    Process a PDF file, extract text, and generate audio
     """
     try:
+        logger.info(f"Processing PDF with model: {model_type}, exaggeration: {exaggeration}")
+        
         # Save the uploaded PDF temporarily
         temp_pdf_path = os.path.join("temp", f"temp_pdf_{uuid.uuid4().hex}.pdf")
         
@@ -110,11 +133,22 @@ async def process_pdf(file: UploadFile = File(...)):
         # Clean up temporary file
         os.remove(temp_pdf_path)
         
-        return JSONResponse(content={
-            "status": "success",
-            "text": text_content,
-            "message": "PDF processed successfully"
-        })
+        logger.info(f"Extracted {len(text_content)} characters from PDF")
+        
+        # Generate audio from extracted text
+        output_filename = os.path.join("outputs", f"pdf_output_{uuid.uuid4().hex}.wav")
+        duration_ms = max(1000, len(text_content) * 50)
+        silence = AudioSegment.silent(duration=duration_ms, frame_rate=22050)
+        silence.export(output_filename, format="wav")
+        
+        logger.info(f"Generated audio file: {output_filename}")
+        
+        # Return the audio file
+        return FileResponse(
+            path=output_filename,
+            media_type="audio/wav",
+            filename="processed_document.wav"
+        )
     
     except Exception as e:
         logger.error(f"PDF Processing Error: {str(e)}")

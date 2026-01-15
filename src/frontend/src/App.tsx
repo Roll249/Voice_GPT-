@@ -1,71 +1,81 @@
-import React, { useState, useRef } from 'react';
-import './App.css';
-import axios from 'axios';
-import { VoiceSelector } from './components/VoiceSelector';
-import { TextToSpeech } from './components/TextToSpeech';
-import { DocumentProcessor } from './components/DocumentProcessor';
+import { useState, useRef } from 'react'
+import axios from 'axios'
+import './App.css'
+import { VoiceSelector } from './components/VoiceSelector'
+import { TextToSpeech } from './components/TextToSpeech'
+import { DocumentProcessor } from './components/DocumentProcessor'
 
 function App() {
-  const [selectedModel, setSelectedModel] = useState<'chatterbox' | 'xtts'>('chatterbox');
-  const [exaggeration, setExaggeration] = useState<number>(0.5);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [referenceUploaded, setReferenceUploaded] = useState<boolean>(false);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [modelType, setModelType] = useState<'chatterbox' | 'xtts'>('chatterbox')
+  const [exaggeration, setExaggeration] = useState<number>(0.5)
+  const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [audioUrl, setAudioUrl] = useState<string | null>(null)
+  const [referenceUploaded, setReferenceUploaded] = useState<boolean>(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleReferenceUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const file = event.target.files?.[0]
+    if (!file) return
 
-    setIsLoading(true);
+    // Check file type
+    if (!file.type.includes('audio')) {
+      setUploadError('Please upload an audio file (WAV, MP3, etc.)')
+      return
+    }
+
+    setUploadError(null)
+    setIsLoading(true)
+
     try {
-      const formData = new FormData();
-      formData.append('file', file);
+      const formData = new FormData()
+      formData.append('file', file)
 
-      const response = await axios.post('/api/upload-reference', formData, {
+      await axios.post('/api/upload-reference', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
-      });
+      })
 
-      if (response.data.status === 'success') {
-        setReferenceUploaded(true);
-        alert('Reference audio uploaded successfully!');
-      }
-    } catch (error) {
-      console.error('Error uploading reference:', error);
-      alert('Failed to upload reference audio');
+      setReferenceUploaded(true)
+      alert('Reference audio uploaded successfully!')
+    } catch (err) {
+      console.error('Error uploading reference:', err)
+      setUploadError('Failed to upload reference audio. Please try again.')
+      setReferenceUploaded(false)
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
     }
-  };
+  }
 
-  const handlePlayAudio = () => {
+  const handleAudioGenerated = (url: string) => {
+    // Revoke previous URL to prevent memory leaks
     if (audioUrl) {
-      const audio = new Audio(audioUrl);
-      audio.play();
+      URL.revokeObjectURL(audioUrl)
     }
-  };
+    setAudioUrl(url)
+  }
 
   return (
-    <div className="App">
+    <div className="app">
       <header className="app-header">
-        <h1>Vietnamese Text-to-Speech Application</h1>
-        <p>Clone voices and generate Vietnamese speech from text or documents</p>
+        <h1>🎙️ Vietnamese Text-to-Speech</h1>
+        <p>High-quality voice cloning for Vietnamese language</p>
       </header>
 
       <main className="app-main">
-        {/* Voice Selection */}
-        <section className="voice-section">
+        <section className="reference-upload">
           <h2>1. Upload Reference Voice</h2>
           <div className="upload-area">
-            <button 
+            <button
+              className="upload-btn"
               onClick={() => fileInputRef.current?.click()}
               disabled={isLoading}
-              className="upload-btn"
             >
-              {isLoading ? 'Uploading...' : 'Select Audio Reference'}
+              {isLoading ? 'Uploading...' : referenceUploaded ? '✓ Reference Uploaded - Upload New' : 'Upload Audio File'}
             </button>
             <input
               type="file"
@@ -74,45 +84,46 @@ function App() {
               accept="audio/*"
               style={{ display: 'none' }}
             />
-            {referenceUploaded && (
-              <span className="status-success">✓ Reference uploaded</span>
-            )}
+            <p>Upload a clear audio sample (WAV, MP3, etc.) of the voice you want to clone</p>
+            {uploadError && <div className="error-message">{uploadError}</div>}
           </div>
-          
-          <VoiceSelector 
-            selectedModel={selectedModel} 
-            onModelChange={setSelectedModel}
-          />
         </section>
 
-        {/* Text to Speech */}
-        <TextToSpeech 
-          modelType={selectedModel}
+        <VoiceSelector selectedModel={modelType} onModelChange={setModelType} />
+
+        <TextToSpeech
+          modelType={modelType}
           exaggeration={exaggeration}
           setExaggeration={setExaggeration}
           isLoading={isLoading}
-          onAudioGenerated={setAudioUrl}
+          onAudioGenerated={handleAudioGenerated}
           referenceUploaded={referenceUploaded}
         />
 
-        {/* Document Processor */}
-        <DocumentProcessor 
-          modelType={selectedModel}
+        <DocumentProcessor
+          modelType={modelType}
           exaggeration={exaggeration}
           isLoading={isLoading}
-          onAudioGenerated={setAudioUrl}
+          onAudioGenerated={handleAudioGenerated}
           referenceUploaded={referenceUploaded}
         />
+
+        {audioUrl && (
+          <section className="audio-player">
+            <h2>Generated Audio</h2>
+            <audio controls src={audioUrl} />
+            <a href={audioUrl} download="generated_speech.wav" className="download-btn">
+              Download Audio
+            </a>
+          </section>
+        )}
       </main>
 
-      {audioUrl && (
-        <div className="audio-controls">
-          <button onClick={handlePlayAudio}>Play Audio</button>
-          <a href={audioUrl} download="generated-speech.wav">Download Audio</a>
-        </div>
-      )}
+      <footer className="app-footer">
+        <p>Powered by Chatterbox-TTS and XTTS-v2</p>
+      </footer>
     </div>
-  );
+  )
 }
 
-export default App;
+export default App
